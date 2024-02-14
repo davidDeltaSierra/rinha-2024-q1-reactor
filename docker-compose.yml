@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.60"
+          cpus: "0.5"
           memory: 215M
     build:
       context: .
@@ -35,13 +35,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.4"
           memory: 110M
     healthcheck:
       test: mongosh --eval 'db.runCommand("ping").ok' --quiet
-      interval: 10s
-      timeout: 5s
-      retries: 6
+      interval: 5s
+      timeout: 3s
+      retries: 24
     image: mongo
     restart: always
     ports:
