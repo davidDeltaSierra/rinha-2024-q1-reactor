@@ -19,35 +19,29 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 215M
+          memory: 128M
     build:
       context: .
     environment:
-      - spring.data.mongodb.uri=mongodb://root:root@mongo:27017/rinha
-    depends_on:
-      mongo:
-        condition: service_healthy
+      - spring.r2dbc.url=r2dbc:postgresql://postgress:5432/rinha
+      - spring.r2dbc.pool.initial-size=40
+      - spring.r2dbc.pool.max-size=200
 
   app-2:
     <<: *app-base
 
-  mongo:
+  postgress:
     deploy:
       resources:
         limits:
           cpus: "0.4"
-          memory: 110M
-    healthcheck:
-      test: mongosh --eval 'db.runCommand("ping").ok' --quiet
-      interval: 5s
-      timeout: 3s
-      retries: 24
-    image: mongo
-    restart: always
-    ports:
-      - "27017:27017"
+          memory: 284M
+    image: postgres:alpine
     volumes:
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=root
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=rinha

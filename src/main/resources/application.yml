@@ -1,4 +1,5 @@
 spring:
-  data:
-    mongodb:
-      uri: mongodb://root:root@localhost:27017/rinha
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/rinha
+    username: root
+    password: root

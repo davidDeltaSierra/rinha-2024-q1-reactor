@@ -4,15 +4,12 @@ import lombok.Builder;
 import lombok.With;
 import org.springframework.data.annotation.Id;
 
-import java.util.List;
-
 @With
 @Builder
 public record Client(
         @Id
         Integer id,
-        Integer limit,
+        Integer limitCents,
         Integer amount,
-        List<Transaction> transactions,
-        Boolean locked) {
+        TransactionCollection transactions) {
 }

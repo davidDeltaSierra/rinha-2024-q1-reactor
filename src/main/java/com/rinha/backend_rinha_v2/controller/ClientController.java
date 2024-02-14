@@ -19,7 +19,7 @@ class ClientController {
     Mono<TransactionResponse> transaction(@Valid @RequestBody TransactionRequest transactionRequest,
                                           @PathVariable Integer id) {
         return clientService.transaction(id, transactionRequest)
-                .map(client -> new TransactionResponse(client.limit(), client.amount()));
+                .map(client -> new TransactionResponse(client.limitCents(), client.amount()));
     }
 
     @GetMapping("{id}/extrato")
