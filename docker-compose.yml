@@ -18,8 +18,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: 128M
+          cpus: "0.4"
+          memory: 160M
     build:
       context: .
     environment:
@@ -34,10 +34,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: 274M
-    image: postgres:alpine
-    command: postgres -c 'max_connections=500'
+          cpus: "0.5"
+          memory: 210M
+    image: postgres
+    command: postgres -c 'max_connections=200'
     volumes:
       - ./scripts:/docker-entrypoint-initdb.d
     environment:
