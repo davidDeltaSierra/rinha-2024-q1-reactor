@@ -1,4 +1,4 @@
-create table rinha.public.client
+create unlogged table rinha.public.client
 (
     id           integer not null
         constraint client_pk primary key,

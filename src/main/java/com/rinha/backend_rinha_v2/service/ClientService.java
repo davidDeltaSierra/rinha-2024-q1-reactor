@@ -4,6 +4,7 @@ import com.rinha.backend_rinha_v2.controller.dto.TransactionRequest;
 import com.rinha.backend_rinha_v2.entity.Client;
 import com.rinha.backend_rinha_v2.entity.Transaction;
 import com.rinha.backend_rinha_v2.entity.TransactionCollection;
+import com.rinha.backend_rinha_v2.entity.TransactionType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 @RequiredArgsConstructor
 public class ClientService {
     private final R2dbcEntityTemplate r2dbcEntityTemplate;
-    private final TransactionalOperator transactionalOperator;
+    private final TransactionalOperator readCommitted;
 
     public Mono<Client> transaction(Integer id, TransactionRequest transactionRequest) {
         return r2dbcEntityTemplate.getDatabaseClient()
@@ -36,10 +37,7 @@ public class ClientService {
                 .first()
                 .switchIfEmpty(Mono.error(new ResponseStatusException(NOT_FOUND)))
                 .flatMap(client -> {
-                    var amount = client.amount() - transactionRequest.amount();
-                    if (client.limitCents() < abs(amount)) {
-                        return Mono.error(new ResponseStatusException(UNPROCESSABLE_ENTITY));
-                    }
+                    var amount = calculateAmount(client, transactionRequest);
                     var transaction = Transaction.builder()
                             .amount(transactionRequest.amount())
                             .type(transactionRequest.type())
@@ -62,7 +60,18 @@ public class ClientService {
                                     .build()
                     );
                 })
-                .as(transactionalOperator::transactional);
+                .as(readCommitted::transactional);
+    }
+
+    private int calculateAmount(Client client, TransactionRequest transactionRequest) {
+        if (transactionRequest.type().equals(TransactionType.d)) {
+            var amount = client.amount() - transactionRequest.amount();
+            if (client.limitCents() < abs(amount)) {
+                throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+            }
+            return amount;
+        }
+        return client.amount() + transactionRequest.amount();
     }
 
     public Mono<Client> extract(Integer id) {
