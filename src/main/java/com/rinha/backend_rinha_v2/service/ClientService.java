@@ -20,7 +20,6 @@ import static java.lang.Math.min;
 import static java.util.Optional.ofNullable;
 import static org.springframework.data.relational.core.query.Criteria.where;
 import static org.springframework.data.relational.core.query.Query.query;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
 @Service
@@ -30,52 +29,59 @@ public class ClientService {
     private final TransactionalOperator readCommitted;
 
     public Mono<Client> transaction(Integer id, TransactionRequest transactionRequest) {
-        return r2dbcEntityTemplate.getDatabaseClient()
-                .sql("SELECT * FROM client WHERE id = $1 FOR UPDATE")
-                .bind(0, id)
-                .map((row, metadata) -> r2dbcEntityTemplate.getConverter().read(Client.class, row, metadata))
-                .first()
-                .switchIfEmpty(Mono.error(new ResponseStatusException(NOT_FOUND)))
-                .flatMap(client -> {
-                    var amount = calculateAmount(client, transactionRequest);
-                    var transaction = Transaction.builder()
-                            .amount(transactionRequest.amount())
-                            .type(transactionRequest.type())
-                            .description(transactionRequest.description())
-                            .createdAt(LocalDateTime.now())
-                            .build();
-                    var transactions = ofNullable(client.transactions())
-                            .map(TransactionCollection::transactions)
-                            .orElseGet(() -> new ArrayList<>(1));
-                    if (!transactions.isEmpty()) {
-                        transactions.sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
-                    }
-                    transactions.addFirst(transaction);
-                    return r2dbcEntityTemplate.update(
-                            Client.builder()
-                                    .id(client.id())
-                                    .limitCents(client.limitCents())
-                                    .amount(amount)
-                                    .transactions(new TransactionCollection(transactions.subList(0, min(10, transactions.size()))))
-                                    .build()
-                    );
-                })
-                .as(readCommitted::transactional);
+        return transaction(id, transactionRequest,
+                Mono.justOrEmpty(TransactionType.from(transactionRequest.type()))
+                        .switchIfEmpty(Mono.error(new ResponseStatusException(UNPROCESSABLE_ENTITY)))
+        );
     }
 
-    private int calculateAmount(Client client, TransactionRequest transactionRequest) {
-        if (transactionRequest.type().equals(TransactionType.d)) {
-            var amount = client.amount() - transactionRequest.amount();
+    private Mono<Client> transaction(int id, TransactionRequest transactionRequest, Mono<TransactionType> validationType) {
+        return validationType.flatMap(type ->
+                r2dbcEntityTemplate.getDatabaseClient()
+                        .sql("SELECT * FROM client WHERE id = $1 FOR UPDATE")
+                        .bind(0, id)
+                        .map((row, metadata) -> r2dbcEntityTemplate.getConverter().read(Client.class, row, metadata))
+                        .first()
+                        .flatMap(client -> {
+                            var amount = calculateAmount(client, transactionRequest.amount(), type);
+                            var transaction = Transaction.builder()
+                                    .amount(transactionRequest.amount())
+                                    .type(type)
+                                    .description(transactionRequest.description())
+                                    .createdAt(LocalDateTime.now())
+                                    .build();
+                            var transactions = ofNullable(client.transactions())
+                                    .map(TransactionCollection::transactions)
+                                    .orElseGet(() -> new ArrayList<>(1));
+                            if (!transactions.isEmpty()) {
+                                transactions.sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
+                            }
+                            transactions.addFirst(transaction);
+                            return r2dbcEntityTemplate.update(
+                                    Client.builder()
+                                            .id(client.id())
+                                            .limitCents(client.limitCents())
+                                            .amount(amount)
+                                            .transactions(new TransactionCollection(transactions.subList(0, min(10, transactions.size()))))
+                                            .build()
+                            );
+                        })
+                        .as(readCommitted::transactional)
+        );
+    }
+
+    private int calculateAmount(Client client, int transactionAmount, TransactionType type) {
+        if (type.equals(TransactionType.d)) {
+            var amount = client.amount() - transactionAmount;
             if (client.limitCents() < abs(amount)) {
                 throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
             }
             return amount;
         }
-        return client.amount() + transactionRequest.amount();
+        return client.amount() + transactionAmount;
     }
 
     public Mono<Client> extract(Integer id) {
-        return r2dbcEntityTemplate.selectOne(query(where("id").is(id)), Client.class)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(NOT_FOUND)));
+        return r2dbcEntityTemplate.selectOne(query(where("id").is(id)), Client.class);
     }
 }

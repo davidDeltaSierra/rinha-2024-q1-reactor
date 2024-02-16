@@ -13,7 +13,7 @@ public record TransactionRequest(
         Integer amount,
         @NotNull
         @JsonProperty("tipo")
-        TransactionType type,
+        String type,
         @NotEmpty
         @JsonProperty("descricao")
         String description
