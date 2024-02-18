@@ -6,7 +6,7 @@ public enum TransactionType {
     public static TransactionType from(String source) {
         try {
             return TransactionType.valueOf(source);
-        } catch (IllegalArgumentException exception) {
+        } catch (Exception exception) {
             return null;
         }
     }
