@@ -21,13 +21,13 @@ services:
       resources:
         limits:
           cpus: "0.6"
-          memory: 180M
+          memory: 160M
     build:
       context: .
     environment:
       - spring.r2dbc.url=r2dbc:postgresql://postgress:5432/rinha
-      - spring.r2dbc.pool.initial-size=10
-      - spring.r2dbc.pool.max-size=100
+      - spring.r2dbc.pool.initial-size=80
+      - spring.r2dbc.pool.max-size=80
 
   app-2:
     container_name: app-2
@@ -39,7 +39,7 @@ services:
       resources:
         limits:
           cpus: "0.2"
-          memory: 160M
+          memory: 200M
     image: postgres
     command: postgres -c 'max_connections=300'
     volumes:
