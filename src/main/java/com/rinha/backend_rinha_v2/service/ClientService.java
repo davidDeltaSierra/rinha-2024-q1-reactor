@@ -14,11 +14,10 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.util.List;
 
 import static java.lang.Math.abs;
-import static java.lang.Math.min;
-import static java.util.Optional.ofNullable;
+import static java.util.Objects.nonNull;
 import static org.springframework.data.relational.core.query.Criteria.where;
 import static org.springframework.data.relational.core.query.Query.query;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
@@ -54,34 +53,35 @@ public class ClientService {
                             .description(transactionRequest.description())
                             .createdAt(LocalDateTime.now())
                             .build();
-                    var transactions = ofNullable(client.transactions())
-                            .map(TransactionCollection::transactions)
-                            .orElseGet(() -> new ArrayList<>(1));
-                    if (!transactions.isEmpty()) {
-                        transactions.sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
+                    if (nonNull(client.getTransactions())) {
+                        client.getTransactions()
+                                .transactions()
+                                .addFirst(transaction);
+                        client.getTransactions()
+                                .transactions()
+                                .sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
+                        if (client.getTransactions().transactions().size() > 10) {
+                            client.getTransactions().transactions().removeLast();
+                        }
+                    } else {
+                        client.setTransactions(new TransactionCollection(List.of(transaction)));
                     }
-                    transactions.addFirst(transaction);
-                    return r2dbcEntityTemplate.update(
-                            Client.builder()
-                                    .id(client.id())
-                                    .limitCents(client.limitCents())
-                                    .amount(amount)
-                                    .transactions(new TransactionCollection(transactions.subList(0, min(10, transactions.size()))))
-                                    .build()
-                    );
+
+                    client.setAmount(amount);
+                    return r2dbcEntityTemplate.update(client);
                 })
                 .as(readCommitted::transactional);
     }
 
     private int calculateAmount(Client client, TransactionRequest transactionRequest) {
         if (transactionRequest.TransactionType().equals(TransactionType.d)) {
-            var amount = client.amount() - transactionRequest.amount().intValue();
-            if (client.limitCents() < abs(amount)) {
+            var amount = client.getAmount() - transactionRequest.amount().intValue();
+            if (client.getLimitCents() < abs(amount)) {
                 throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
             }
             return amount;
         }
-        return client.amount() + transactionRequest.amount().intValue();
+        return client.getAmount() + transactionRequest.amount().intValue();
     }
 
     public Mono<Client> extract(Integer id) {

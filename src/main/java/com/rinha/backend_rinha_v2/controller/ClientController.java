@@ -2,13 +2,15 @@ package com.rinha.backend_rinha_v2.controller;
 
 import com.rinha.backend_rinha_v2.controller.dto.ExtractResponse;
 import com.rinha.backend_rinha_v2.controller.dto.TransactionRequest;
-import com.rinha.backend_rinha_v2.controller.dto.TransactionResponse;
 import com.rinha.backend_rinha_v2.service.ClientService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("clientes")
@@ -16,9 +18,9 @@ import reactor.core.publisher.Mono;
 class ClientController {
     private final ClientService clientService;
 
-    @PostMapping("{id}/transacoes")
-    Mono<ResponseEntity<TransactionResponse>> transaction(@RequestBody TransactionRequest transactionRequest,
-                                                          @PathVariable String id) {
+    @PostMapping(value = "{id}/transacoes", produces = MediaType.APPLICATION_JSON_VALUE)
+    Mono<ResponseEntity<?>> transaction(@RequestBody TransactionRequest transactionRequest,
+                                        @PathVariable String id) {
         return Mono.just(id)
                 .flatMap(anStringId -> {
                     var parsedId = parseInt(anStringId);
@@ -26,7 +28,7 @@ class ClientController {
                         return Mono.just(ResponseEntity.unprocessableEntity().build());
                     }
                     return clientService.validateAndRunTransaction(parsedId, transactionRequest)
-                            .map(client -> ResponseEntity.ok(new TransactionResponse(client.limitCents(), client.amount())))
+                            .map(client -> ResponseEntity.ok(Map.of("limite", client.getLimitCents(), "saldo", client.getAmount())))
                             .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()))
                             .onErrorResume(ResponseStatusException.class, ex -> Mono.just(ResponseEntity.status(ex.getStatusCode()).build()));
                 });

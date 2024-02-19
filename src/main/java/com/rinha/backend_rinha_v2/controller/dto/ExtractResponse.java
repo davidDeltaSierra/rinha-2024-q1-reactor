@@ -41,9 +41,9 @@ public record ExtractResponse(
 
     public static ExtractResponse newExtractResponse(Client client) {
         return new ExtractResponse(
-                new Amount(client.amount(), client.limitCents(), LocalDateTime.now()),
-                nonNull(client.transactions()) && nonNull(client.transactions().transactions())
-                        ? client.transactions().transactions().stream()
+                new Amount(client.getAmount(), client.getLimitCents(), LocalDateTime.now()),
+                nonNull(client.getTransactions()) && nonNull(client.getTransactions().transactions())
+                        ? client.getTransactions().transactions().stream()
                         .map(t -> new Transaction(t.amount(), t.type(), t.description(), t.createdAt()))
                         .toList()
                         : List.of()
