@@ -27,8 +27,13 @@ services:
     image: daviddeltasierra/rinha-2024-q1-reactor
     environment:
       - spring.r2dbc.url=r2dbc:postgresql://postgress:5432/rinha
-      - spring.r2dbc.pool.initial-size=50
-      - spring.r2dbc.pool.max-size=50
+      - spring.r2dbc.username=postgres
+      - spring.r2dbc.password=root
+      - spring.r2dbc.pool.initial-size=30
+      - spring.r2dbc.pool.max-size=30
+    depends_on:
+      postgress:
+        condition: service_healthy
 
   app-2:
     container_name: app-2
@@ -41,11 +46,15 @@ services:
         limits:
           cpus: "0.2"
           memory: 200M
-    image: postgres
-    command: postgres -c 'max_connections=300'
+    image: postgres:alpine
+    user: postgres
+    command: postgres -c 'max_connections=160'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      retries: 6
     volumes:
       - ./scripts:/docker-entrypoint-initdb.d
     environment:
-      - POSTGRES_USER=root
       - POSTGRES_PASSWORD=root
       - POSTGRES_DB=rinha
