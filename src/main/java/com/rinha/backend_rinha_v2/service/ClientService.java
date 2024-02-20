@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,43 +46,50 @@ public class ClientService {
                 .bind(0, id)
                 .map((row, metadata) -> r2dbcEntityTemplate.getConverter().read(Client.class, row, metadata))
                 .first()
-                .flatMap(client -> {
-                    var amount = calculateAmount(client, transactionRequest);
-                    var transaction = Transaction.builder()
-                            .amount(transactionRequest.amount().intValue())
-                            .type(transactionRequest.TransactionType())
-                            .description(transactionRequest.description())
-                            .createdAt(LocalDateTime.now())
-                            .build();
-                    if (nonNull(client.getTransactions())) {
-                        client.getTransactions()
-                                .transactions()
-                                .addFirst(transaction);
-                        client.getTransactions()
-                                .transactions()
-                                .sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
-                        if (client.getTransactions().transactions().size() > 10) {
-                            client.getTransactions().transactions().removeLast();
-                        }
-                    } else {
-                        client.setTransactions(new TransactionCollection(List.of(transaction)));
-                    }
-
-                    client.setAmount(amount);
-                    return r2dbcEntityTemplate.update(client);
+                .flatMap(client -> Mono.zip(createTransaction(transactionRequest, client), calculateAmount(client, transactionRequest)))
+                .flatMap(tuple -> {
+                    tuple.getT1().setAmount(tuple.getT2());
+                    return r2dbcEntityTemplate.update(tuple.getT1());
                 })
                 .as(readCommitted::transactional);
     }
 
-    private int calculateAmount(Client client, TransactionRequest transactionRequest) {
-        if (transactionRequest.TransactionType().equals(TransactionType.d)) {
-            var amount = client.getAmount() - transactionRequest.amount().intValue();
-            if (client.getLimitCents() < abs(amount)) {
-                throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+    private Mono<Client> createTransaction(TransactionRequest transactionRequest, Client client) {
+        return Mono.fromSupplier(() -> {
+            var transaction = Transaction.builder()
+                    .amount(transactionRequest.amount().intValue())
+                    .type(transactionRequest.TransactionType())
+                    .description(transactionRequest.description())
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            if (nonNull(client.getTransactions())) {
+                client.getTransactions()
+                        .transactions()
+                        .addFirst(transaction);
+                client.getTransactions()
+                        .transactions()
+                        .sort((o1, o2) -> o2.createdAt().compareTo(o1.createdAt()));
+                if (client.getTransactions().transactions().size() > 10) {
+                    client.getTransactions().transactions().removeLast();
+                }
+            } else {
+                client.setTransactions(new TransactionCollection(List.of(transaction)));
             }
-            return amount;
-        }
-        return client.getAmount() + transactionRequest.amount().intValue();
+            return client;
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<Integer> calculateAmount(Client client, TransactionRequest transactionRequest) {
+        return Mono.fromSupplier(() -> {
+            if (transactionRequest.TransactionType().equals(TransactionType.d)) {
+                var amount = client.getAmount() - transactionRequest.amount().intValue();
+                if (client.getLimitCents() < abs(amount)) {
+                    throw new ResponseStatusException(UNPROCESSABLE_ENTITY);
+                }
+                return amount;
+            }
+            return client.getAmount() + transactionRequest.amount().intValue();
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     public Mono<Client> extract(Integer id) {
