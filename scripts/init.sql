@@ -4,7 +4,7 @@ create unlogged table rinha.public.client
         constraint client_pk primary key,
     limit_cents  integer not null,
     amount       integer not null,
-    transactions json
+    transactions jsonb
 );
 
 INSERT INTO public.client (id, limit_cents, amount) VALUES (1, 100000, 0);

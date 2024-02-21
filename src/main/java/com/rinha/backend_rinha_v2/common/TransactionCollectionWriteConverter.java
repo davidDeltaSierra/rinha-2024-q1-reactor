@@ -3,6 +3,7 @@ package com.rinha.backend_rinha_v2.common;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rinha.backend_rinha_v2.entity.TransactionCollection;
 import io.r2dbc.postgresql.codec.Json;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.core.convert.converter.Converter;
@@ -17,10 +18,10 @@ class TransactionCollectionWriteConverter implements Converter<TransactionCollec
 
     @Override
     @SneakyThrows
-    public Json convert(TransactionCollection source) {
+    public Json convert(@Nullable TransactionCollection source) {
         if (isNull(source)) {
             return null;
         }
-        return Json.of(objectMapper.writeValueAsString(source));
+        return Json.of(objectMapper.writeValueAsBytes(source));
     }
 }
