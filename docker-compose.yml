@@ -6,7 +6,7 @@ services:
       resources:
         limits:
           cpus: "0.1"
-          memory: 30M
+          memory: 10M
     image: nginx
     network_mode: host
     volumes:
@@ -20,7 +20,7 @@ services:
       resources:
         limits:
           cpus: "0.6"
-          memory: 190M
+          memory: 200M
     build:
       context: .
     image: daviddeltasierra/rinha-2024-q1-reactor
